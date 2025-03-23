@@ -1,0 +1,166 @@
+definitions:
+  model.AllowedCrawlResponse:
+    description: Is crawl allowed for the domain
+    properties:
+      error:
+        type: string
+      is_allowed:
+        type: boolean
+      status_code:
+        type: integer
+    type: object
+  model.Rule:
+    description: Represents a custom rule for a domain
+    properties:
+      created_at:
+        type: string
+      domain:
+        type: string
+      id:
+        type: integer
+      robots_txt:
+        type: string
+      updated_at:
+        type: string
+    type: object
+info:
+  contact: { }
+paths:
+  /crawl-allowed:
+    get:
+      description: Check if the given user agent is allowed to crawl the specified
+        URL based on the robots.txt rules
+      parameters:
+        - description: URL to check
+          in: query
+          name: url
+          required: true
+          type: string
+        - description: User agent to check
+          in: query
+          name: user_agent
+          required: true
+          type: string
+      produces:
+        - application/json
+      responses:
+        "200":
+          description: Response object
+          schema:
+            $ref: '#/definitions/model.AllowedCrawlResponse'
+      summary: Check if crawling is allowed for a specific user agent and URL
+      tags:
+        - Crawling
+  /custom-rule:
+    delete:
+      description: Delete an existing custom rule based on the provided ID.
+      parameters:
+        - description: Custom rule ID
+          in: query
+          name: id
+          required: true
+          type: string
+      produces:
+        - application/json
+      responses:
+        "200":
+          description: Rule deleted successfully
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: [ ]
+      summary: Delete a custom rule by ID
+      tags:
+        - Custom Rule
+    get:
+      description: Retrieve a custom rule based on the provided query parameter 'id'
+        or 'url'
+      parameters:
+        - description: Custom rule ID
+          in: query
+          name: id
+          type: string
+        - description: Custom rule URL
+          in: query
+          name: url
+          type: string
+      produces:
+        - application/json
+      responses:
+        "200":
+          description: Custom rule object
+          schema:
+            $ref: '#/definitions/model.Rule'
+      security:
+        - ApiKeyAuth: [ ]
+      summary: Get custom rule by ID or URL
+      tags:
+        - Custom Rule
+    post:
+      consumes:
+        - text/plain
+      description: Create a new custom rule by providing a URL and the corresponding
+        rule file
+      parameters:
+        - description: URL for the custom rule
+          in: query
+          name: url
+          required: true
+          type: string
+        - description: Custom rule file content
+          in: body
+          name: file
+          required: true
+          schema:
+            type: string
+      produces:
+        - application/json
+      responses:
+        "200":
+          description: Custom rule created successfully
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: [ ]
+      summary: Create a custom rule
+      tags:
+        - Custom Rule
+    put:
+      consumes:
+        - text/plain
+      description: Update an existing custom rule based on the provided ID.
+      parameters:
+        - description: Custom rule ID
+          in: query
+          name: id
+          required: true
+          type: string
+        - description: New URL for the custom rule
+          in: query
+          name: url
+          required: true
+          type: string
+        - description: Updated custom rule file content
+          in: body
+          name: file
+          required: true
+          schema:
+            type: string
+      produces:
+        - application/json
+      responses:
+        "200":
+          description: Updated custom rule
+          schema:
+            $ref: '#/definitions/model.Rule'
+      security:
+        - ApiKeyAuth: [ ]
+      summary: Update a custom rule by ID
+      tags:
+        - Custom Rule
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: X-API-Key
+    type: apiKey
+swagger: "2.0"
