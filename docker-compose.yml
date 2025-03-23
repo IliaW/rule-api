@@ -1,0 +1,25 @@
+services:
+  app:
+    build:
+      context: .
+    environment:
+      - ENV=local
+    ports:
+      - "8081:8081"
+    depends_on:
+      - db
+      - cache
+
+  db:
+    image: postgres:15.4
+    environment:
+      POSTGRES_PASSWORD: test
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./database/migration/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  cache:
+    image: memcached:1.6
+    ports:
+      - "11211:11211"
