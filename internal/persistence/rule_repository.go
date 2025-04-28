@@ -38,9 +38,10 @@ func (r *RuleRepository) GetByUrl(url string) (*model.Rule, error) {
 		return nil, errors.New(fmt.Sprintf("failed to parse url. %s", err.Error()))
 	}
 	var rule model.Rule
-	row := r.db.QueryRow(`SELECT id, domain, robots_txt, created_at, updated_at 
-									FROM web_crawler.custom_rule WHERE domain = $1`, domain)
-	err = row.Scan(&rule.ID, &rule.Domain, &rule.RobotsTxt, &rule.CreatedAt, &rule.UpdatedAt)
+	row := r.db.QueryRow(`SELECT id, domain, blocked, robots_txt, created_at, updated_at 
+								FROM web_crawler.custom_rule 
+								WHERE domain = $1`, domain)
+	err = row.Scan(&rule.ID, &rule.Domain, &rule.Blocked, &rule.RobotsTxt, &rule.CreatedAt, &rule.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, errors.New(fmt.Sprintf("rule with domain '%s' not found", domain))
@@ -55,10 +56,10 @@ func (r *RuleRepository) GetByUrl(url string) (*model.Rule, error) {
 
 func (r *RuleRepository) GetById(id string) (*model.Rule, error) {
 	var rule model.Rule
-	row := r.db.QueryRow(`SELECT id, domain, robots_txt, created_at, updated_at 
-									FROM web_crawler.custom_rule WHERE id = $1`,
-		id)
-	err := row.Scan(&rule.ID, &rule.Domain, &rule.RobotsTxt, &rule.CreatedAt, &rule.UpdatedAt)
+	row := r.db.QueryRow(`SELECT id, domain, blocked, robots_txt, created_at, updated_at 
+								FROM web_crawler.custom_rule 
+								WHERE id = $1`, id)
+	err := row.Scan(&rule.ID, &rule.Domain, &rule.Blocked, &rule.RobotsTxt, &rule.CreatedAt, &rule.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, errors.New(fmt.Sprintf("rule with id '%s' not found", id))
@@ -75,8 +76,8 @@ func (r *RuleRepository) Save(rule *model.Rule) (int64, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	var id int64
-	err := r.db.QueryRow("INSERT INTO web_crawler.custom_rule (domain, robots_txt) VALUES ($1, $2) RETURNING id",
-		rule.Domain, rule.RobotsTxt).Scan(&id)
+	err := r.db.QueryRow(`INSERT INTO web_crawler.custom_rule (domain, blocked, robots_txt) 
+								VALUES ($1, $2, $3) RETURNING id`, rule.Domain, rule.Blocked, rule.RobotsTxt).Scan(&id)
 	if err != nil {
 		return 0, err
 	}
@@ -86,8 +87,9 @@ func (r *RuleRepository) Save(rule *model.Rule) (int64, error) {
 }
 
 func (r *RuleRepository) Update(rule *model.Rule) (*model.Rule, error) {
-	_, err := r.db.Exec("UPDATE web_crawler.custom_rule SET domain = $1, robots_txt = $2 WHERE id = $3",
-		rule.Domain, rule.RobotsTxt, rule.ID)
+	_, err := r.db.Exec(`UPDATE web_crawler.custom_rule 
+								SET domain = $1, blocked = $2, robots_txt = $3 
+								WHERE id = $4`, rule.Domain, rule.Blocked, rule.RobotsTxt, rule.ID)
 	if err != nil {
 		return nil, err
 	}

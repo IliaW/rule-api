@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/IliaW/rule-api/config"
 	cacheClient "github.com/IliaW/rule-api/internal/cache"
@@ -50,6 +51,7 @@ func (h *RuleApiHandler) GetAllowedCrawl(c *gin.Context) {
 	if url == "" {
 		c.JSON(http.StatusBadRequest, model.AllowedCrawlResponse{
 			IsAllowed:  false,
+			Blocked:    false,
 			StatusCode: http.StatusBadRequest,
 			Error:      "'url' query parameter is required",
 		})
@@ -60,6 +62,7 @@ func (h *RuleApiHandler) GetAllowedCrawl(c *gin.Context) {
 	if userAgent == "" {
 		c.JSON(http.StatusBadRequest, model.AllowedCrawlResponse{
 			IsAllowed:  false,
+			Blocked:    false,
 			StatusCode: http.StatusBadRequest,
 			Error:      "'user_agent' query parameter is required",
 		})
@@ -69,11 +72,13 @@ func (h *RuleApiHandler) GetAllowedCrawl(c *gin.Context) {
 
 	var robotsTxt string
 	var targetResponseStatusCode int
+	blocked := false
 
 	// check the custom rule for the given url in database
 	rule, err := h.ruleRepo.GetByUrl(url)
 	if err == nil && rule != nil && rule.RobotsTxt != "" {
 		robotsTxt = rule.RobotsTxt
+		blocked = rule.Blocked
 		targetResponseStatusCode = http.StatusOK
 	} else {
 		// upload the robots.txt file if custom rule is not found in database
@@ -82,6 +87,7 @@ func (h *RuleApiHandler) GetAllowedCrawl(c *gin.Context) {
 			// most likely, there is no access to the URL, or the robots.txt file does not exist
 			c.JSON(http.StatusInternalServerError, model.AllowedCrawlResponse{
 				IsAllowed:  false,
+				Blocked:    blocked,
 				StatusCode: http.StatusInternalServerError,
 				Error:      err.Error(),
 			})
@@ -91,6 +97,7 @@ func (h *RuleApiHandler) GetAllowedCrawl(c *gin.Context) {
 		if !isSuccess(tResp.StatusCode) {
 			c.JSON(http.StatusOK, model.AllowedCrawlResponse{
 				IsAllowed:  false,
+				Blocked:    blocked,
 				StatusCode: tResp.StatusCode,
 				Error:      string(tResp.Body),
 			})
@@ -104,6 +111,7 @@ func (h *RuleApiHandler) GetAllowedCrawl(c *gin.Context) {
 	if ok := grobotstxt.AgentAllowed(robotsTxt, userAgent, url); ok {
 		c.JSON(http.StatusOK, model.AllowedCrawlResponse{
 			IsAllowed:  true,
+			Blocked:    blocked,
 			StatusCode: targetResponseStatusCode,
 			Error:      "",
 		})
@@ -113,6 +121,7 @@ func (h *RuleApiHandler) GetAllowedCrawl(c *gin.Context) {
 
 	c.JSON(http.StatusOK, model.AllowedCrawlResponse{
 		IsAllowed:  false,
+		Blocked:    blocked,
 		StatusCode: targetResponseStatusCode,
 		Error:      "",
 	})
@@ -165,6 +174,7 @@ func (h *RuleApiHandler) GetCustomRule(c *gin.Context) {
 // @Accept plain
 // @Produce json
 // @Param url query string true "URL for the custom rule"
+// @Param blocked query bool false "Block the domain from being crawled"
 // @Param file body string true "Custom rule file content"
 // @Success 200 {object} string "Custom rule created successfully"
 // @Security ApiKeyAuth
@@ -174,6 +184,12 @@ func (h *RuleApiHandler) CreateCustomRule(c *gin.Context) {
 	if url == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "'url' query parameter is required"})
 		return
+	}
+
+	b := c.DefaultQuery("blocked", "false")
+	blocked, err := strconv.ParseBool(b)
+	if err != nil {
+		blocked = false
 	}
 
 	body, err := io.ReadAll(c.Request.Body)
@@ -195,6 +211,7 @@ func (h *RuleApiHandler) CreateCustomRule(c *gin.Context) {
 	id, err := h.ruleRepo.Save(&model.Rule{
 		Domain:    domain,
 		RobotsTxt: string(body),
+		Blocked:   blocked,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError,
@@ -206,40 +223,39 @@ func (h *RuleApiHandler) CreateCustomRule(c *gin.Context) {
 }
 
 // UpdateCustomRule godoc
-// @Summary Update a custom rule by ID
-// @Description Update an existing custom rule based on the provided ID.
+// @Summary Update a custom rule by ID or URL
+// @Description Update an existing custom rule based on the provided ID or URL.
 // @Tags Custom Rule
 // @Accept plain
 // @Produce json
-// @Param id query string true "Custom rule ID"
-// @Param url query string true "New URL for the custom rule"
+// @Param id query string false "Custom rule ID"
+// @Param url query string false "Custom rule URL"
+// @Param blocked query bool true "Block the domain from being crawled"
 // @Param file body string true "Updated custom rule file content"
 // @Success 200 {object} model.Rule "Updated custom rule"
 // @Security ApiKeyAuth
 // @Router /custom-rule [put]
 func (h *RuleApiHandler) UpdateCustomRule(c *gin.Context) {
 	id := c.Query("id")
-	if id == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "'id' query parameter is required"})
-		return
-	}
-
-	rule, err := h.ruleRepo.GetById(id)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		return
-	}
-
 	url := c.Query("url")
-	domain, err := util.GetDomain(url)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to parse url. %s", err.Error())})
+	if id == "" && url == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "'id' or 'url' query parameter is required"})
 		return
 	}
-	rule.Domain = domain
 
-	body, err := io.ReadAll(c.Request.Body)
-	if err != nil {
+	b := c.Query("blocked")
+	if b == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "'blocked' query parameter is required"})
+		return
+	}
+	blocked, parseErr := strconv.ParseBool(b)
+	if parseErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "unable to parse 'blocked' query parameter"})
+		return
+	}
+
+	body, readErr := io.ReadAll(c.Request.Body)
+	if readErr != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "unable to read file"})
 		return
 	}
@@ -247,7 +263,31 @@ func (h *RuleApiHandler) UpdateCustomRule(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "custom rules are not found or empty"})
 		return
 	}
+
+	var rule *model.Rule
+	var err error
+	if id != "" {
+		rule, err = h.ruleRepo.GetById(id)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("failed to get rule by id. %s", err.Error())})
+			return
+		}
+	} else {
+		rule, err = h.ruleRepo.GetByUrl(url)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("failed to get rule by url. %s", err.Error())})
+			return
+		}
+	}
+
+	// skip updating if no changes are made
+	if rule.RobotsTxt == string(body) && rule.Blocked == blocked {
+		c.JSON(http.StatusOK, rule)
+		return
+	}
+
 	rule.RobotsTxt = string(body)
+	rule.Blocked = blocked
 
 	result, err := h.ruleRepo.Update(rule)
 	if err != nil {
@@ -314,7 +354,7 @@ func (h *RuleApiHandler) requestToRobotsTxt(url string) (*model.TargetResponse, 
 		return nil, errors.New(fmt.Sprintf("failed to parse url. %s", err.Error()))
 	}
 	req, err := http.NewRequest(http.MethodGet, baseUrl+"/robots.txt", nil)
-	req.Header.Set("User-Agent", h.cfg.UserAgent)
+	req.Header.Set("User-Agent", h.cfg.RuleUserAgent)
 	resp, err := h.httpClient.Do(req)
 	if err != nil {
 		slog.Error(fmt.Sprintf("error making http get request to %s/robots.txt", baseUrl),

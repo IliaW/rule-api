@@ -19,7 +19,7 @@ type Config struct {
 	CorsMaxAgeHours    time.Duration     `mapstructure:"cors_max_age_hours"`
 	RuleApiUrlPath     string            `mapstructure:"rule_api_url_path"`
 	MaxBodySize        int64             `mapstructure:"max_body_size"`
-	UserAgent          string            `mapstructure:"user_agent"`
+	RuleUserAgent      string            `mapstructure:"rule_user_agent"`
 	CacheSettings      *CacheConfig      `mapstructure:"cache"`
 	DbSettings         *DatabaseConfig   `mapstructure:"database"`
 	HttpClientSettings *HttpClientConfig `mapstructure:"http_client"`
