@@ -8,6 +8,7 @@ import "time"
 type Rule struct {
 	ID        int       `json:"id"`
 	Domain    string    `json:"domain"`
+	Blocked   bool      `json:"blocked"`
 	RobotsTxt string    `json:"robots_txt"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -18,6 +19,7 @@ type Rule struct {
 // @Type AllowedCrawlResponse
 type AllowedCrawlResponse struct {
 	IsAllowed  bool   `json:"is_allowed"`
+	Blocked    bool   `json:"blocked"`
 	StatusCode int    `json:"status_code"`
 	Error      string `json:"error"`
 }

@@ -7,7 +7,7 @@ version: "1.0.0"
 cors_max_age_hours: "24h"
 rule_api_url_path: "/rule/v1"
 max_body_size: 2 # Max MB size for request body
-user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" # User agent for /robots.txt requests.
+rule_user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" # User agent for /robots.txt requests.
 
 cache:
   servers: "cache:11211"

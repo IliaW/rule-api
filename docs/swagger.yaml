@@ -2,6 +2,8 @@ definitions:
   model.AllowedCrawlResponse:
     description: Is crawl allowed for the domain
     properties:
+      blocked:
+        type: boolean
       error:
         type: string
       is_allowed:
@@ -12,6 +14,8 @@ definitions:
   model.Rule:
     description: Represents a custom rule for a domain
     properties:
+      blocked:
+        type: boolean
       created_at:
         type: string
       domain:
@@ -107,6 +111,10 @@ paths:
           name: url
           required: true
           type: string
+        - description: Block the domain from being crawled
+          in: query
+          name: blocked
+          type: boolean
         - description: Custom rule file content
           in: body
           name: file
@@ -128,18 +136,21 @@ paths:
     put:
       consumes:
         - text/plain
-      description: Update an existing custom rule based on the provided ID.
+      description: Update an existing custom rule based on the provided ID or URL.
       parameters:
         - description: Custom rule ID
           in: query
           name: id
-          required: true
           type: string
-        - description: New URL for the custom rule
+        - description: Custom rule URL
           in: query
           name: url
-          required: true
           type: string
+        - description: Block the domain from being crawled
+          in: query
+          name: blocked
+          required: true
+          type: boolean
         - description: Updated custom rule file content
           in: body
           name: file
@@ -155,7 +166,7 @@ paths:
             $ref: '#/definitions/model.Rule'
       security:
         - ApiKeyAuth: [ ]
-      summary: Update a custom rule by ID
+      summary: Update a custom rule by ID or URL
       tags:
         - Custom Rule
 securityDefinitions:

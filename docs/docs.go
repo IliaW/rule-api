@@ -95,7 +95,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Update an existing custom rule based on the provided ID.",
+                "description": "Update an existing custom rule based on the provided ID or URL.",
                 "consumes": [
                     "text/plain"
                 ],
@@ -105,19 +105,24 @@ const docTemplate = `{
                 "tags": [
                     "Custom Rule"
                 ],
-                "summary": "Update a custom rule by ID",
+                "summary": "Update a custom rule by ID or URL",
                 "parameters": [
                     {
                         "type": "string",
                         "description": "Custom rule ID",
                         "name": "id",
-                        "in": "query",
-                        "required": true
+                        "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "New URL for the custom rule",
+                        "description": "Custom rule URL",
                         "name": "url",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Block the domain from being crawled",
+                        "name": "blocked",
                         "in": "query",
                         "required": true
                     },
@@ -164,6 +169,12 @@ const docTemplate = `{
                         "name": "url",
                         "in": "query",
                         "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Block the domain from being crawled",
+                        "name": "blocked",
+                        "in": "query"
                     },
                     {
                         "description": "Custom rule file content",
@@ -223,6 +234,9 @@ const docTemplate = `{
             "description": "Is crawl allowed for the domain",
             "type": "object",
             "properties": {
+                "blocked": {
+                    "type": "boolean"
+                },
                 "error": {
                     "type": "string"
                 },
@@ -238,6 +252,9 @@ const docTemplate = `{
             "description": "Represents a custom rule for a domain",
             "type": "object",
             "properties": {
+                "blocked": {
+                    "type": "boolean"
+                },
                 "created_at": {
                     "type": "string"
                 },

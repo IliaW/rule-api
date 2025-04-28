@@ -153,7 +153,7 @@ func Test_GetAllowedCrawl_Handler(t *testing.T) {
 		t.Run(test.name, func(tt *testing.T) {
 			// mock config
 			cfg := &config.Config{
-				UserAgent: test.robotsUserAgent,
+				RuleUserAgent: test.robotsUserAgent,
 				TelemetrySettings: &config.TelemetryConfig{
 					Enabled: false,
 				},
@@ -216,7 +216,7 @@ func Test_GetCustomRule_Handler(t *testing.T) {
 			},
 			mockMethodName: "GetByUrl",
 			expectedResponse: "{\"id\":1,\"domain\":\"example.com\",\"robots_txt\":\"User-agent: * \\n Allow: " +
-				"/test\",\"created_at\":\"0001-01-01T00:00:00Z\",\"updated_at\":\"0001-01-01T00:00:00Z\"}",
+				"/test\",\"blocked\":false,\"created_at\":\"0001-01-01T00:00:00Z\",\"updated_at\":\"0001-01-01T00:00:00Z\"}",
 			expectedStatusCode: http.StatusOK,
 		},
 		{
@@ -243,7 +243,7 @@ func Test_GetCustomRule_Handler(t *testing.T) {
 			},
 			mockMethodName: "GetById",
 			expectedResponse: "{\"id\":1,\"domain\":\"example.com\",\"robots_txt\":\"User-agent: * \\n Allow: " +
-				"/test\",\"created_at\":\"0001-01-01T00:00:00Z\",\"updated_at\":\"0001-01-01T00:00:00Z\"}",
+				"/test\",\"blocked\":false,\"created_at\":\"0001-01-01T00:00:00Z\",\"updated_at\":\"0001-01-01T00:00:00Z\"}",
 			expectedStatusCode: http.StatusOK,
 		},
 		{
@@ -380,20 +380,23 @@ func Test_UpdateCustomRule_Handler(t *testing.T) {
 		},
 	})
 	testSet := []struct {
-		name                      string
-		id                        string
-		url                       string
-		body                      string
-		mockGetByIdStorageRequest func() (*model.Rule, error)
-		mockUpdateStorageRequest  func() (*model.Rule, error)
-		expectedResponse          string
-		expectedStatusCode        int
+		name                       string
+		id                         string
+		url                        string
+		blocked                    string
+		body                       string
+		mockGetByIdStorageRequest  func() (*model.Rule, error)
+		mockGetByUrlStorageRequest func() (*model.Rule, error)
+		mockUpdateStorageRequest   func() (*model.Rule, error)
+		expectedResponse           string
+		expectedStatusCode         int
 	}{
 		{
-			name: "update url and body by rule id",
-			id:   "1",
-			url:  "https://example2.com/test",
-			body: "User-agent: * \n Disallow: /test",
+			name:    "update body by rule id",
+			id:      "1",
+			url:     "",
+			blocked: "false",
+			body:    "User-agent: * \n Disallow: /test",
 			mockGetByIdStorageRequest: func() (*model.Rule, error) {
 				return &model.Rule{
 					ID:        1,
@@ -401,70 +404,134 @@ func Test_UpdateCustomRule_Handler(t *testing.T) {
 					RobotsTxt: "User-agent: * \n Allow: /test",
 				}, nil
 			},
+			mockGetByUrlStorageRequest: func() (*model.Rule, error) {
+				return &model.Rule{}, nil
+			},
 			mockUpdateStorageRequest: func() (*model.Rule, error) {
 				return &model.Rule{
 					ID:        1,
-					Domain:    "example2.com",
+					Domain:    "example.com",
 					RobotsTxt: "User-agent: * \n Disallow: /test",
 				}, nil
 			},
-			expectedResponse: "{\"id\":1,\"domain\":\"example2.com\",\"robots_txt\":\"User-agent: * " +
-				"\\n Disallow: /test\",\"created_at\":\"0001-01-01T00:00:00Z\",\"updated_at\":\"0001-01-01T00:00:00Z\"}",
+			expectedResponse: "{\"id\":1,\"domain\":\"example.com\",\"robots_txt\":\"User-agent: * " +
+				"\\n Disallow: /test\",\"blocked\":false,\"created_at\":\"0001-01-01T00:00:00Z\",\"updated_at\":\"0001-01-01T00:00:00Z\"}",
 			expectedStatusCode: http.StatusOK,
 		},
 		{
-			name: "empty id in query",
-			id:   "",
-			url:  "https://example2.com/test",
-			body: "User-agent: * \n Disallow: /test",
+			name:    "update body by url",
+			id:      "",
+			url:     "https://example.com/test",
+			blocked: "false",
+			body:    "User-agent: * \n Disallow: /test",
 			mockGetByIdStorageRequest: func() (*model.Rule, error) {
+				return &model.Rule{}, nil
+			},
+			mockGetByUrlStorageRequest: func() (*model.Rule, error) {
+				return &model.Rule{
+					ID:        1,
+					Domain:    "example.com",
+					RobotsTxt: "User-agent: * \n Allow: /test",
+				}, nil
+			},
+			mockUpdateStorageRequest: func() (*model.Rule, error) {
+				return &model.Rule{
+					ID:        1,
+					Domain:    "example.com",
+					RobotsTxt: "User-agent: * \n Disallow: /test",
+				}, nil
+			},
+			expectedResponse: "{\"id\":1,\"domain\":\"example.com\",\"robots_txt\":\"User-agent: * " +
+				"\\n Disallow: /test\",\"blocked\":false,\"created_at\":\"0001-01-01T00:00:00Z\",\"updated_at\":\"0001-01-01T00:00:00Z\"}",
+			expectedStatusCode: http.StatusOK,
+		},
+		{
+			name:    "empty id and url in query parameter",
+			id:      "",
+			url:     "",
+			blocked: "false",
+			body:    "User-agent: * \n Disallow: /test",
+			mockGetByIdStorageRequest: func() (*model.Rule, error) {
+				return &model.Rule{}, nil
+			},
+			mockGetByUrlStorageRequest: func() (*model.Rule, error) {
 				return &model.Rule{}, nil
 			},
 			mockUpdateStorageRequest: func() (*model.Rule, error) {
 				return &model.Rule{}, nil
 			},
-			expectedResponse:   "{\"error\":\"'id' query parameter is required\"}",
+			expectedResponse:   "{\"error\":\"'id' or 'url' query parameter is required\"}",
 			expectedStatusCode: http.StatusBadRequest,
 		},
 		{
-			name: "non-existent id in query",
-			id:   "2",
-			url:  "https://example2.com/test",
-			body: "User-agent: * \n Disallow: /test",
+			name:    "empty blocked query parameter",
+			id:      "1",
+			url:     "https://example.com/test",
+			blocked: "",
+			body:    "User-agent: * \n Disallow: /test",
+			mockGetByIdStorageRequest: func() (*model.Rule, error) {
+				return &model.Rule{}, nil
+			},
+			mockGetByUrlStorageRequest: func() (*model.Rule, error) {
+				return &model.Rule{}, nil
+			},
+			mockUpdateStorageRequest: func() (*model.Rule, error) {
+				return &model.Rule{}, nil
+			},
+			expectedResponse:   "{\"error\":\"'blocked' query parameter is required\"}",
+			expectedStatusCode: http.StatusBadRequest,
+		},
+		{
+			name:    "non-existent id in query",
+			id:      "2",
+			url:     "",
+			blocked: "false",
+			body:    "User-agent: * \n Disallow: /test",
 			mockGetByIdStorageRequest: func() (*model.Rule, error) {
 				return nil, errors.New("rule with id '2' not found")
 			},
+			mockGetByUrlStorageRequest: func() (*model.Rule, error) {
+				return &model.Rule{}, nil
+			},
 			mockUpdateStorageRequest: func() (*model.Rule, error) {
 				return &model.Rule{}, nil
 			},
-			expectedResponse:   "{\"error\":\"rule with id '2' not found\"}",
+			expectedResponse:   "{\"error\":\"failed to get rule by id. rule with id '2' not found\"}",
 			expectedStatusCode: http.StatusNotFound,
 		},
 		{
-			name: "invalid url in query",
-			id:   "2",
-			url:  "example2.com/test",
-			body: "User-agent: * \n Disallow: /test",
+			name:    "non-existent url in query",
+			id:      "",
+			url:     "https://example.com/test",
+			blocked: "false",
+			body:    "User-agent: * \n Disallow: /test",
 			mockGetByIdStorageRequest: func() (*model.Rule, error) {
-				return nil, nil
+				return &model.Rule{}, nil
+			},
+			mockGetByUrlStorageRequest: func() (*model.Rule, error) {
+				return nil, errors.New("rule with domain 'example.com' not found")
 			},
 			mockUpdateStorageRequest: func() (*model.Rule, error) {
 				return &model.Rule{}, nil
 			},
-			expectedResponse:   "{\"error\":\"failed to parse url. invalid url. Url should contain scheme and hostname\"}",
-			expectedStatusCode: http.StatusInternalServerError,
+			expectedResponse:   "{\"error\":\"failed to get rule by url. rule with domain 'example.com' not found\"}",
+			expectedStatusCode: http.StatusNotFound,
 		},
 		{
-			name: "error in database when update custom rule",
-			id:   "1",
-			url:  "https://example2.com/test",
-			body: "User-agent: * \n Disallow: /test",
+			name:    "error in database when update custom rule",
+			id:      "1",
+			url:     "",
+			blocked: "false",
+			body:    "User-agent: * \n Disallow: /test",
 			mockGetByIdStorageRequest: func() (*model.Rule, error) {
 				return &model.Rule{
 					ID:        1,
 					Domain:    "example.com",
 					RobotsTxt: "User-agent: * \n Allow: /test",
 				}, nil
+			},
+			mockGetByUrlStorageRequest: func() (*model.Rule, error) {
+				return &model.Rule{}, nil
 			},
 			mockUpdateStorageRequest: func() (*model.Rule, error) {
 				return nil, errors.New("something went wrong")
@@ -478,13 +545,14 @@ func Test_UpdateCustomRule_Handler(t *testing.T) {
 			// mock storage
 			ruleRepo := storageMock.NewRuleStorage(tt)
 			ruleRepo.On("GetById", mock.Anything).Maybe().Return(test.mockGetByIdStorageRequest())
+			ruleRepo.On("GetByUrl", mock.Anything).Maybe().Return(test.mockGetByUrlStorageRequest())
 			ruleRepo.On("Update", mock.Anything).Maybe().Return(test.mockUpdateStorageRequest())
 
 			r := gin.Default()
 			robotsHandler := NewRuleApiHandler(nil, nil, ruleRepo, nil, metrics.ApiMetrics)
 			r.PUT("/custom-rule", robotsHandler.UpdateCustomRule)
-			req, _ := http.NewRequest("PUT", fmt.Sprintf("/custom-rule?id=%s&url=%s",
-				test.id, test.url),
+			req, _ := http.NewRequest("PUT", fmt.Sprintf("/custom-rule?id=%s&url=%s&blocked=%s",
+				test.id, test.url, test.blocked),
 				strings.NewReader(test.body))
 			w := httptest.NewRecorder()
 			r.ServeHTTP(w, req)

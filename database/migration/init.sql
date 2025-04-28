@@ -22,9 +22,10 @@ CREATE TABLE IF NOT EXISTS web_crawler.custom_rule
 (
     id         SERIAL PRIMARY KEY,
     domain     VARCHAR(80) NOT NULL UNIQUE,
+    blocked    BOOL        NOT NULL DEFAULT FALSE,
     robots_txt TEXT        NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP            DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP            DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT domain_index UNIQUE (domain)
 );
 
